@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+<title>My Goal System</title>
+<style>
+  :root {
+    --navy: #1F3A5F;
+    --navy-dark: #16293F;
+    --steel: #3B6FA0;
+    --copper: #C6601E;
+    --green: #3C8C6B;
+    --purple: #7A5195;
+    --red: #B5482A;
+    --ink: #1A1A1A;
+    --grey: #6B6B6B;
+    --light-grey: #9a9a9a;
+    --bg: #FAFAF8;
+    --card: #FFFFFF;
+    --border: #E5E1D8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+  }
+  .wrap { max-width: 480px; margin: 0 auto; padding-bottom: 48px; }
+
+  .header {
+    background: linear-gradient(135deg, var(--navy), var(--navy-dark));
+    color: white;
+    padding: 28px 20px 20px;
+  }
+  .header .eyebrow {
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: rgba(255,255,255,0.6); font-weight: 600; margin-bottom: 6px;
+  }
+  .header h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+  .header p { margin: 6px 0 0; color: rgba(255,255,255,0.7); font-size: 14px; }
+  .sync-status { font-size: 11px; margin-top: 10px; color: rgba(255,255,255,0.55); }
+  .sync-status.ok::before { content: "● "; color: #6FCF97; }
+  .sync-status.err::before { content: "● "; color: #E2725B; }
+  .sync-status.pending::before { content: "● "; color: #E0C04C; }
+
+  .tabs {
+    display: flex; gap: 6px; padding: 12px 14px; overflow-x: auto;
+    position: sticky; top: 0; background: var(--bg); z-index: 10;
+    border-bottom: 1px solid var(--border);
+  }
+  .tab-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border);
+    background: white; color: var(--grey); font-size: 13px; font-weight: 600;
+    white-space: nowrap; cursor: pointer;
+  }
+  .tab-btn.active { background: var(--navy); color: white; border-color: var(--navy); }
+
+  .content { padding: 14px; }
+
+  .day-meta { display: flex; justify-content: space-between; align-items: baseline; padding: 0 4px 6px; }
+  .day-meta .date { font-size: 13px; color: var(--grey); }
+  .day-meta .count { font-size: 13px; font-weight: 700; color: #333; }
+  .reset-btn { font-size: 12px; color: var(--light-grey); background: none; border: none; cursor: pointer; padding: 4px; }
+
+  .progress-bar { width: 100%; height: 6px; background: #EFEBE3; border-radius: 999px; overflow: hidden; margin: 4px 0 14px; }
+  .progress-fill { height: 100%; border-radius: 999px; transition: width 0.3s; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    overflow: hidden; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  }
+  .card-head {
+    display: flex; align-items: center; gap: 12px; padding: 14px 18px;
+    cursor: pointer; width: 100%; background: none; border: none; text-align: left;
+  }
+  .card-icon {
+    width: 34px; height: 34px; border-radius: 11px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 16px;
+  }
+  .card-title-wrap { flex: 1; }
+  .card-title { font-weight: 700; font-size: 15px; color: #111; }
+  .card-subtitle { font-size: 12.5px; color: var(--grey); margin-top: 1px; }
+  .chevron { color: var(--light-grey); font-size: 14px; transition: transform 0.2s; }
+  .card-body { padding: 0 10px 10px; }
+  .card-body.collapsed { display: none; }
+
+  .row {
+    width: 100%; display: flex; align-items: flex-start; gap: 12px;
+    text-align: left; background: none; border: none; cursor: pointer;
+    padding: 10px 10px; border-radius: 10px;
+  }
+  .row:hover { background: rgba(0,0,0,0.03); }
+  .checkbox {
+    margin-top: 2px; flex-shrink: 0; width: 20px; height: 20px; border-radius: 6px;
+    border: 2px solid #D8D2C4; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; color: white; font-weight: 700;
+  }
+  .checkbox.checked { border-color: transparent; }
+  .row-text { flex: 1; }
+  .row-label { font-size: 15px; font-weight: 600; line-height: 1.35; color: #222; }
+  .row-label.checked { color: #B5B0A4; text-decoration: line-through; }
+  .row-detail { font-size: 13px; color: var(--grey); margin-top: 2px; }
+  .row-detail.checked { color: #C9C4B8; }
+
+  .custom-row { display: flex; align-items: flex-start; gap: 12px; padding: 10px 10px; }
+  .custom-input {
+    width: 100%; border: none; border-bottom: 1px solid var(--border);
+    font-size: 15px; font-weight: 600; padding: 4px 0; background: transparent;
+    font-family: inherit; color: #222;
+  }
+  .custom-input:focus { outline: none; border-bottom-color: var(--navy); }
+  .custom-input.checked { color: #B5B0A4; text-decoration: line-through; }
+  .custom-sub { font-size: 13px; color: var(--grey); margin-top: 4px; }
+
+  .note-italic { font-size: 12.5px; color: var(--grey); font-style: italic; padding: 0 12px 8px; }
+  .radar-note { font-size: 12px; color: var(--light-grey); font-style: italic; padding: 6px 12px 2px; }
+
+  .week-pills { display: flex; gap: 6px; margin-bottom: 10px; }
+  .week-pill {
+    flex: 1; padding: 8px; border-radius: 10px; border: 1px solid var(--border);
+    background: white; color: var(--grey); font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .week-pill.active { background: var(--navy); color: white; border-color: var(--navy); }
+
+  .footer-note { text-align: center; font-size: 11px; color: var(--light-grey); padding-top: 10px; }
+  .focus-line { font-size: 13px; font-weight: 600; color: #333; padding: 0 4px 6px; }
+
+  .bottom-notes { font-size: 12px; color: var(--light-grey); font-style: italic; padding: 12px 8px; line-height: 1.6; }
+
+  .loading-screen {
+    display: flex; align-items: center; justify-content: center; height: 60vh;
+    color: var(--grey); font-size: 14px;
+  }
+
+  /* Calendar / History view */
+  .history-btn {
+    display: flex; align-items: center; gap: 6px; padding: 7px 12px;
+    border-radius: 999px; border: 1px solid rgba(255,255,255,0.25);
+    background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.85);
+    font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 12px;
+  }
+  .history-btn:hover { background: rgba(255,255,255,0.15); }
+
+  .calendar-overlay {
+    position: fixed; inset: 0; background: rgba(20,20,18,0.45);
+    display: flex; align-items: flex-end; justify-content: center; z-index: 100;
+  }
+  .calendar-sheet {
+    background: var(--bg); width: 100%; max-width: 480px; border-radius: 22px 22px 0 0;
+    padding: 18px 18px 28px; max-height: 85vh; overflow-y: auto;
+    animation: slideUp 0.22s ease-out;
+  }
+  @keyframes slideUp { from { transform: translateY(24px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .calendar-header h2 { font-size: 17px; margin: 0; color: #1a1a1a; }
+  .calendar-nav { display: flex; gap: 4px; }
+  .calendar-nav button {
+    width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border);
+    background: white; color: var(--navy); font-size: 14px; cursor: pointer;
+  }
+  .calendar-close {
+    width: 30px; height: 30px; border-radius: 8px; border: none;
+    background: #EFEBE3; color: var(--grey); font-size: 15px; cursor: pointer;
+  }
+  .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+  .cal-dow { text-align: center; font-size: 11px; color: var(--light-grey); font-weight: 700; padding-bottom: 4px; }
+  .cal-day {
+    aspect-ratio: 1; border-radius: 11px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; cursor: pointer; border: 1px solid transparent;
+    position: relative; background: white; font-size: 13px; color: #333;
+  }
+  .cal-day.empty { visibility: hidden; cursor: default; }
+  .cal-day.today { border-color: var(--navy); font-weight: 700; }
+  .cal-day .dot { width: 5px; height: 5px; border-radius: 50%; margin-top: 2px; }
+  .cal-day.has-data { font-weight: 600; }
+  .cal-day:hover { background: #F0EDE5; }
+  .cal-legend { display: flex; gap: 14px; margin-top: 14px; font-size: 11.5px; color: var(--grey); justify-content: center; }
+  .cal-legend span { display: flex; align-items: center; gap: 5px; }
+  .legend-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+
+  .history-day-view { padding-top: 4px; }
+  .history-back {
+    display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--navy);
+    font-weight: 600; background: none; border: none; cursor: pointer; padding: 6px 0 12px;
+  }
+  .history-date-title { font-size: 18px; font-weight: 700; color: #1a1a1a; margin-bottom: 2px; }
+  .history-sub { font-size: 13px; color: var(--grey); margin-bottom: 14px; }
+  .readonly-note {
+    font-size: 12px; color: var(--light-grey); font-style: italic;
+    text-align: center; padding: 10px 0 4px;
+  }
+  .row.readonly { cursor: default; }
+  .row.readonly:hover { background: none; }
+</style>
+</head>
+<body>
+
+<div id="app" class="wrap">
+  <div class="loading-screen">Loading…</div>
+</div>
+
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCMTeAom5PZgoblFEdSRqh-aaIQfpCD-pE",
+  authDomain: "goal-system-50030.firebaseapp.com",
+  databaseURL: "https://goal-system-50030-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "goal-system-50030",
+  storageBucket: "goal-system-50030.firebasestorage.app",
+  messagingSenderId: "499532940345",
+  appId: "1:499532940345:web:1d2948d866775ab32e39e8"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const stateRef = ref(db, "checklistState");
+
+// ---------------- Data: Yearly / Monthly / Weekly structure ----------------
+const YEARLY_GOALS = [
+  { id: "y1", area: "School", text: "Physics course (24 hr) — complete & understand", window: "Month 1–2" },
+  { id: "y2", area: "School", text: "C basics (~4 hr course)", window: "Month 1" },
+  { id: "y3", area: "Tech/Career", text: "Linux — understand full filesystem", window: "Month 1–2" },
+  { id: "y4", area: "Tech/Career", text: "Web development — regular practice", window: "Month 2–4, ongoing" },
+  { id: "y5", area: "Tech/Career", text: "OWASP Top 10 (2017, 2021, 2025) — memorise & understand", window: "Month 3–4" },
+  { id: "y6", area: "Career", text: "Build resume + collect certificates", window: "Month 5" },
+  { id: "y7", area: "Career", text: "Land a remote part-time job / internship", window: "Month 5–6 onward" },
+  { id: "y8", area: "Personal Project", text: "Game dev — platformer (Geometry Dash–style)", window: "Month 6–9" },
+  { id: "y9", area: "Personal", text: "Chess — climb from ~1100 toward 2000 Elo", window: "All year" },
+  { id: "y10", area: "Personal", text: "Japanese — basic level", window: "All year" },
+  { id: "y11", area: "Health", text: "Boxing basics", window: "All year" },
+];
+const AREA_COLORS = {
+  "School": "#3B6FA0", "Tech/Career": "#1F3A5F", "Career": "#C6601E",
+  "Personal Project": "#7A5195", "Personal": "#3C8C6B", "Health": "#B5482A",
+};
+const MONTH1 = {
+  theme: "Foundations — quick wins to build momentum",
+  goals: [
+    { id: "m1g1", text: "Physics course (24 hr total) — complete and actually understand it", note: "~6 hrs/week across 4 weeks. Better to understand 20 hrs deeply than rush all 24." },
+    { id: "m1g2", text: "C basics course (~4 hr)", note: "Quick win — aim to finish in week 1 or 2." },
+    { id: "m1g3", text: "Linux filesystem — understand it fully", note: "Structure, permissions, key directories. Pairs naturally with C." },
+  ]
+};
+const ONGOING_HABITS = [
+  { id: "h_chess", label: "Chess", detail: "a game or a review" },
+  { id: "h_jp", label: "Japanese", detail: "10–15 min" },
+  { id: "h_box", label: "Boxing", detail: "if it's a training day" },
+];
+const WEEKS = [
+  { n: 1, focus: "Get moving — start all three, don't aim for finishing yet", tasks: [
+    { id: "w1t1", label: "C basics", detail: "Start the course — aim to finish this week if possible" },
+    { id: "w1t2", label: "Physics", detail: "Begin course — target ~6 hrs this week (Hours 1–6 of 24)" },
+    { id: "w1t3", label: "Linux", detail: "Learn the root directory structure (/etc, /bin, /home, /var)" },
+  ]},
+  { n: 2, focus: "Build depth — C should wrap up, physics continues", tasks: [
+    { id: "w2t1", label: "C basics", detail: "Finish the course if not done — a few small practice programs" },
+    { id: "w2t2", label: "Physics", detail: "Continue — target Hours 7–12 of 24" },
+    { id: "w2t3", label: "Linux", detail: "Permissions & ownership (chmod, chown, users/groups)" },
+  ]},
+  { n: 3, focus: "Physics gets serious — this is the heavier week", tasks: [
+    { id: "w3t1", label: "Physics", detail: "Target Hours 13–18 of 24 — slow down if anything feels shaky" },
+    { id: "w3t2", label: "Linux", detail: "Processes, filesystem hierarchy standard (FHS), mounting" },
+    { id: "w3t3", label: "Review", detail: "Quick recap of C basics — make sure it stuck" },
+  ]},
+  { n: 4, focus: "Finish strong — close out physics, consolidate Linux", tasks: [
+    { id: "w4t1", label: "Physics", detail: "Finish remaining hours (19–24) — leave buffer if behind" },
+    { id: "w4t2", label: "Linux", detail: "Tie it together — explain the filesystem as if teaching someone" },
+    { id: "w4t3", label: "Wrap-up", detail: "Fill out the Month 1 end-of-month review" },
+  ]},
+];
+
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
+function dateKeyFor(year, month, day) {
+  return `${year}-${month + 1}-${day}`;
+}
+
+// Builds the list of daily storage keys for a given date key + a given week (for the Top 3 lookup)
+function dailyIdsFor(dk, week) {
+  return [
+    "d_hydrate","d_glance","d_stretch","d_eat1","d_lunch","d_break",
+    `d_wk${week.tasks[0].id}`, `d_wk${week.tasks[1].id}`, `d_wk${week.tasks[2].id}`, "d_custom",
+    "d_h_chess","d_h_jp","d_h_box","d_tomorrow","d_screens","d_lights"
+  ].map(s => `${dk}_${s}`);
+}
+
+// Heuristic: any date's progress is computed against the currently active week's plan,
+// since we don't retroactively know which week was "active" on a past date.
+function progressForDate(dk, week) {
+  const ids = dailyIdsFor(dk, week);
+  const done = ids.filter(id => state[id]).length;
+  return { done, total: ids.length, pct: Math.round((done / ids.length) * 100) };
+}
+
+// ---------------- App state ----------------
+let state = {};
+let tab = "daily";
+let activeWeek = 1;
+let syncStatus = "pending"; // pending | ok | err
+let calendarOpen = false;
+let calendarViewDate = new Date(); // which month the calendar is showing
+let historyDate = null; // { year, month, day, key } when viewing a past day, else null
+
+const dKey = todayKey();
+
+// ---------------- Firebase sync ----------------
+function setSyncStatus(s) {
+  syncStatus = s;
+  const el = document.getElementById("sync-status");
+  if (el) {
+    el.className = "sync-status " + s;
+    el.textContent = s === "ok" ? "Synced" : s === "err" ? "Sync error — check connection" : "Syncing…";
+  }
+}
+
+function saveState() {
+  setSyncStatus("pending");
+  set(stateRef, state).then(() => setSyncStatus("ok")).catch((e) => {
+    console.error("Firebase save error", e);
+    setSyncStatus("err");
+  });
+}
+
+function toggle(key) {
+  state[key] = !state[key];
+  render();
+  saveState();
+}
+
+function setCustomText(key, value) {
+  state[key] = value;
+  saveState();
+}
+
+// Listen for remote changes (so a second device's edits show up here too)
+onValue(stateRef, (snapshot) => {
+  const remote = snapshot.val();
+  if (remote) {
+    state = remote;
+  }
+  setSyncStatus("ok");
+  render();
+}, (error) => {
+  console.error("Firebase read error", error);
+  setSyncStatus("err");
+  render();
+});
+
+// ---------------- Rendering ----------------
+const ICONS = {
+  sunrise: "🌅", sun: "☀️", target: "🎯", moon: "🌙", calendar: "📅", week: "🗓️"
+};
+
+function checkboxHtml(id, checked, color) {
+  return `<span class="checkbox ${checked ? "checked" : ""}" style="${checked ? `background:${color || "#1F3A5F"}` : ""}">${checked ? "✓" : ""}</span>`;
+}
+
+function rowHtml(id, label, detail, checked, opts = {}) {
+  const color = opts.color || "#1F3A5F";
+  return `
+    <button class="row" data-toggle="${id}">
+      ${checkboxHtml(id, checked, color)}
+      <span class="row-text">
+        <div class="row-label ${checked ? "checked" : ""}" style="${opts.bold ? "font-weight:700;" : ""}">${label}</div>
+        ${detail ? `<div class="row-detail ${checked ? "checked" : ""}">${detail}</div>` : ""}
+      </span>
+    </button>`;
+}
+
+function cardHtml(id, icon, title, subtitle, accent, bodyHtml, collapsed) {
+  return `
+    <div class="card">
+      <button class="card-head" data-cardtoggle="${id}">
+        <span class="card-icon" style="background:${accent}">${icon}</span>
+        <span class="card-title-wrap">
+          <div class="card-title">${title}</div>
+          ${subtitle ? `<div class="card-subtitle">${subtitle}</div>` : ""}
+        </span>
+        <span class="chevron">${collapsed ? "▸" : "▾"}</span>
+      </button>
+      <div class="card-body ${collapsed ? "collapsed" : ""}" id="body-${id}">${bodyHtml}</div>
+    </div>`;
+}
+
+let collapsedCards = {};
+
+// ---------------- Calendar / History ----------------
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const DOW = ["S","M","T","W","T","F","S"];
+
+function renderCalendarOverlay() {
+  const week = WEEKS[activeWeek - 1];
+  const year = calendarViewDate.getFullYear();
+  const month = calendarViewDate.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = new Date();
+  const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+
+  let cells = "";
+  for (let i = 0; i < firstDay; i++) cells += `<div class="cal-day empty"></div>`;
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dk = dateKeyFor(year, month, day);
+    const { done, total } = progressForDate(dk, week);
+    const isToday = isCurrentMonth && today.getDate() === day;
+    const isFuture = new Date(year, month, day) > today;
+    let dotColor = "";
+    if (!isFuture && done > 0) {
+      dotColor = done === total ? "#3C8C6B" : "#E0C04C";
+    }
+    cells += `
+      <div class="cal-day ${isToday ? "today" : ""} ${done > 0 ? "has-data" : ""}" ${isFuture ? "" : `data-history-date="${dk}"`} style="${isFuture ? "opacity:0.35;cursor:default;" : ""}">
+        ${day}
+        ${dotColor ? `<span class="dot" style="background:${dotColor}"></span>` : ""}
+      </div>`;
+  }
+
+  const dowHtml = DOW.map(d => `<div class="cal-dow">${d}</div>`).join("");
+
+  return `
+    <div class="calendar-overlay" id="calendar-overlay">
+      <div class="calendar-sheet">
+        <div class="calendar-header">
+          <div class="calendar-nav">
+            <button id="cal-prev">‹</button>
+            <button id="cal-next">›</button>
+          </div>
+          <h2>${MONTH_NAMES[month]} ${year}</h2>
+          <button class="calendar-close" id="cal-close">✕</button>
+        </div>
+        <div class="calendar-grid">${dowHtml}${cells}</div>
+        <div class="cal-legend">
+          <span><span class="legend-dot" style="background:#3C8C6B"></span> Full day</span>
+          <span><span class="legend-dot" style="background:#E0C04C"></span> Partial</span>
+          <span><span class="legend-dot" style="background:#D8D2C4"></span> No activity</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+function readonlyRowHtml(label, detail, checked, opts = {}) {
+  const color = opts.color || "#1F3A5F";
+  return `
+    <div class="row readonly">
+      ${checkboxHtml("", checked, color)}
+      <span class="row-text">
+        <div class="row-label ${checked ? "checked" : ""}" style="${opts.bold ? "font-weight:700;" : ""}">${label}</div>
+        ${detail ? `<div class="row-detail ${checked ? "checked" : ""}">${detail}</div>` : ""}
+      </span>
+    </div>`;
+}
+
+function renderHistoryDay() {
+  const week = WEEKS[activeWeek - 1];
+  const dk = historyDate.key;
+  const { done, total, pct } = progressForDate(dk, week);
+  const dateObj = new Date(historyDate.year, historyDate.month, historyDate.day);
+  const dateStr = dateObj.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  const customText = state[`${dk}_d_custom_text`] || "";
+  const customChecked = !!state[`${dk}_d_custom`];
+
+  let html = `
+    <div class="history-day-view">
+      <button class="history-back" id="history-back-btn">← Back to today</button>
+      <div class="history-date-title">${dateStr}</div>
+      <div class="history-sub">${done} / ${total} completed that day</div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:#1F3A5F"></div></div>`;
+
+  html += cardHtml("h-morning", ICONS.sunrise, "Early Morning", null, "#3B6FA0", `
+    ${readonlyRowHtml("Hydrate — glass of water right away", null, !!state[`${dk}_d_hydrate`])}
+    ${readonlyRowHtml("Quick glance at today's plan", null, !!state[`${dk}_d_glance`])}
+    ${readonlyRowHtml("Light stretch or movement", null, !!state[`${dk}_d_stretch`])}
+    ${readonlyRowHtml("Eat something before heading out", null, !!state[`${dk}_d_eat1`])}
+  `, false);
+
+  html += cardHtml("h-midday", ICONS.sun, "During the Day", null, "#C6601E", `
+    ${readonlyRowHtml("Eat lunch properly, away from screens", null, !!state[`${dk}_d_lunch`])}
+    ${readonlyRowHtml("One short break outside or away from screens", null, !!state[`${dk}_d_break`])}
+  `, false);
+
+  let top3body = `
+    ${readonlyRowHtml(week.tasks[0].label, week.tasks[0].detail, !!state[`${dk}_d_wk${week.tasks[0].id}`], { bold: true, color: "#1F3A5F" })}
+    ${readonlyRowHtml(week.tasks[1].label, week.tasks[1].detail, !!state[`${dk}_d_wk${week.tasks[1].id}`], { bold: true, color: "#1F3A5F" })}
+    ${readonlyRowHtml(week.tasks[2].label, week.tasks[2].detail, !!state[`${dk}_d_wk${week.tasks[2].id}`], { bold: true, color: "#1F3A5F" })}`;
+  if (customText) {
+    top3body += readonlyRowHtml(customText, "Open slot task", customChecked, { bold: true, color: "#1F3A5F" });
+  }
+  html += cardHtml("h-top3", ICONS.target, "Top 3 — that day's work", null, "#1F3A5F", top3body, false);
+
+  html += cardHtml("h-habits", ICONS.moon, "Ongoing Habits", null, "#3C8C6B", `
+    ${readonlyRowHtml("Chess", "a game or a review", !!state[`${dk}_d_h_chess`], { color: "#3C8C6B" })}
+    ${readonlyRowHtml("Japanese", "10–15 min", !!state[`${dk}_d_h_jp`], { color: "#3C8C6B" })}
+    ${readonlyRowHtml("Boxing", "if it's a training day", !!state[`${dk}_d_h_box`], { color: "#3C8C6B" })}
+  `, false);
+
+  html += cardHtml("h-night", ICONS.moon, "Night", null, "#7A5195", `
+    ${readonlyRowHtml("Write tomorrow's top 3 before stopping work", null, !!state[`${dk}_d_tomorrow`])}
+    ${readonlyRowHtml("Screens off 20–30 min before bed", null, !!state[`${dk}_d_screens`])}
+    ${readonlyRowHtml("Lights out by 10–11pm", null, !!state[`${dk}_d_lights`])}
+  `, false);
+
+  html += `<div class="readonly-note">This is a read-only look back — past days can't be edited.</div></div>`;
+  return html;
+}
+
+function renderDaily() {
+  const week = WEEKS[activeWeek - 1];
+  const customKey = `${dKey}_d_custom_text`;
+  const customChecked = !!state[`${dKey}_d_custom`];
+  const customText = state[customKey] || "";
+
+  const dailyIds = [
+    "d_hydrate","d_glance","d_stretch","d_eat1","d_lunch","d_break",
+    `d_wk${week.tasks[0].id}`, `d_wk${week.tasks[1].id}`, `d_wk${week.tasks[2].id}`, "d_custom",
+    "d_h_chess","d_h_jp","d_h_box","d_tomorrow","d_screens","d_lights"
+  ].map(s => `${dKey}_${s}`);
+  const done = dailyIds.filter(id => state[id]).length;
+  const pct = Math.round((done / dailyIds.length) * 100);
+
+  const dateStr = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+
+  let html = `
+    <div class="day-meta">
+      <div><div class="date">${dateStr}</div><div class="count">${done} / ${dailyIds.length} done today</div></div>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <button class="reset-btn" id="open-calendar-btn" style="color:var(--navy); font-weight:600;">🗓 History</button>
+        <button class="reset-btn" id="reset-day-btn">↺ Reset day</button>
+      </div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:#C6601E"></div></div>`;
+
+  html += cardHtml("morning", ICONS.sunrise, "Early Morning", null, "#3B6FA0", `
+    ${rowHtml(`${dKey}_d_hydrate`, "Hydrate — glass of water right away", null, !!state[`${dKey}_d_hydrate`])}
+    ${rowHtml(`${dKey}_d_glance`, "Quick glance at today's plan", null, !!state[`${dKey}_d_glance`])}
+    ${rowHtml(`${dKey}_d_stretch`, "Light stretch or movement", null, !!state[`${dKey}_d_stretch`])}
+    ${rowHtml(`${dKey}_d_eat1`, "Eat something before heading out", null, !!state[`${dKey}_d_eat1`])}
+  `, collapsedCards["morning"]);
+
+  html += cardHtml("midday", ICONS.sun, "During the Day", null, "#C6601E", `
+    ${rowHtml(`${dKey}_d_lunch`, "Eat lunch properly, away from screens", null, !!state[`${dKey}_d_lunch`])}
+    ${rowHtml(`${dKey}_d_break`, "One short break outside or away from screens", null, !!state[`${dKey}_d_break`])}
+  `, collapsedCards["midday"]);
+
+  const top3body = `
+    <div class="note-italic">Pause and plan each one — don't just start doing. Know the goal, then execute.</div>
+    ${rowHtml(`${dKey}_d_wk${week.tasks[0].id}`, week.tasks[0].label, week.tasks[0].detail, !!state[`${dKey}_d_wk${week.tasks[0].id}`], { bold: true, color: "#1F3A5F" })}
+    ${rowHtml(`${dKey}_d_wk${week.tasks[1].id}`, week.tasks[1].label, week.tasks[1].detail, !!state[`${dKey}_d_wk${week.tasks[1].id}`], { bold: true, color: "#1F3A5F" })}
+    ${rowHtml(`${dKey}_d_wk${week.tasks[2].id}`, week.tasks[2].label, week.tasks[2].detail, !!state[`${dKey}_d_wk${week.tasks[2].id}`], { bold: true, color: "#1F3A5F" })}
+    <div class="custom-row">
+      ${checkboxHtml("custom", customChecked, "#1F3A5F").replace("<span", `<button data-toggle="${dKey}_d_custom" style="border:none;background:none;padding:0;cursor:pointer;display:inline-flex;margin-top:2px;"><span`).replace("</span>","</span></button>")}
+      <span style="flex:1">
+        <input class="custom-input ${customChecked ? "checked" : ""}" id="custom-task-input" type="text" placeholder="Anything else for today? (optional)" value="${customText.replace(/"/g, '&quot;')}" />
+        <div class="custom-sub">Open slot — not from the weekly plan</div>
+      </span>
+    </div>`;
+  html += cardHtml("top3", ICONS.target, "Top 3 — today's actual work", `Auto-filled from Week ${week.n}'s plan`, "#1F3A5F", top3body, collapsedCards["top3"]);
+
+  html += cardHtml("habits", ICONS.moon, "Ongoing Habits", "Light touch, most days", "#3C8C6B", `
+    ${rowHtml(`${dKey}_d_h_chess`, "Chess", "a game or a review", !!state[`${dKey}_d_h_chess`], { color: "#3C8C6B" })}
+    ${rowHtml(`${dKey}_d_h_jp`, "Japanese", "10–15 min", !!state[`${dKey}_d_h_jp`], { color: "#3C8C6B" })}
+    ${rowHtml(`${dKey}_d_h_box`, "Boxing", "if it's a training day", !!state[`${dKey}_d_h_box`], { color: "#3C8C6B" })}
+    <div class="radar-note">On the radar, not daily: YouTube video upload — no fixed schedule, just don't let it disappear.</div>
+  `, collapsedCards["habits"]);
+
+  html += cardHtml("night", ICONS.moon, "Night", null, "#7A5195", `
+    ${rowHtml(`${dKey}_d_tomorrow`, "Write tomorrow's top 3 before stopping work", null, !!state[`${dKey}_d_tomorrow`])}
+    ${rowHtml(`${dKey}_d_screens`, "Screens off 20–30 min before bed", null, !!state[`${dKey}_d_screens`])}
+    ${rowHtml(`${dKey}_d_lights`, "Lights out by 10–11pm", null, !!state[`${dKey}_d_lights`])}
+  `, collapsedCards["night"]);
+
+  return html;
+}
+
+function renderWeekly() {
+  const week = WEEKS[activeWeek - 1];
+  const weekDone = week.tasks.filter(t => state[t.id]).length;
+  const pct = Math.round((weekDone / week.tasks.length) * 100);
+
+  let pills = `<div class="week-pills">`;
+  WEEKS.forEach(w => {
+    pills += `<button class="week-pill ${activeWeek === w.n ? "active" : ""}" data-week="${w.n}">Week ${w.n}</button>`;
+  });
+  pills += `</div>`;
+
+  let html = pills;
+  html += `<div class="focus-line">${week.focus}</div>`;
+  html += `<div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:#1F3A5F"></div></div>`;
+
+  let tasksHtml = "";
+  week.tasks.forEach(t => {
+    tasksHtml += rowHtml(t.id, t.label, t.detail, !!state[t.id], { bold: true, color: "#1F3A5F" });
+  });
+  html += cardHtml("week-tasks", ICONS.target, "This Week's Focus Tasks", null, "#1F3A5F", tasksHtml, collapsedCards["week-tasks"]);
+
+  let habitsHtml = "";
+  ONGOING_HABITS.forEach(h => {
+    const key = `${h.id}_w${week.n}`;
+    habitsHtml += rowHtml(key, h.label, h.detail, !!state[key], { color: "#3C8C6B" });
+  });
+  html += cardHtml("week-habits", ICONS.moon, "Ongoing Habits This Week", null, "#3C8C6B", habitsHtml, collapsedCards["week-habits"]);
+
+  return html;
+}
+
+function renderMonthly() {
+  const done = MONTH1.goals.filter(g => state[g.id]).length;
+  const pct = Math.round((done / MONTH1.goals.length) * 100);
+
+  let html = `<div class="focus-line">${MONTH1.theme}</div>`;
+  html += `<div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:#C6601E"></div></div>`;
+
+  let goalsHtml = "";
+  MONTH1.goals.forEach(g => {
+    goalsHtml += rowHtml(g.id, g.text, g.note, !!state[g.id], { bold: true, color: "#C6601E" });
+  });
+  html += cardHtml("month-goals", ICONS.target, "This Month's Goals", null, "#C6601E", goalsHtml, collapsedCards["month-goals"]);
+
+  let habitsHtml = "";
+  ONGOING_HABITS.forEach(h => {
+    const key = `${h.id}_m1`;
+    habitsHtml += rowHtml(key, h.label, h.detail, !!state[key], { color: "#3C8C6B" });
+  });
+  html += cardHtml("month-habits", ICONS.moon, "Ongoing This Month", null, "#3C8C6B", habitsHtml, collapsedCards["month-habits"]);
+
+  return html;
+}
+
+function renderYearly() {
+  const done = YEARLY_GOALS.filter(g => state[g.id]).length;
+  const pct = Math.round((done / YEARLY_GOALS.length) * 100);
+
+  let html = `<div class="focus-line">The big picture — review monthly</div>`;
+  html += `<div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:#1F3A5F"></div></div>`;
+
+  const byArea = {};
+  YEARLY_GOALS.forEach(g => { (byArea[g.area] = byArea[g.area] || []).push(g); });
+
+  Object.entries(byArea).forEach(([area, goals]) => {
+    const areaDone = goals.filter(g => state[g.id]).length;
+    let goalsHtml = "";
+    goals.forEach(g => {
+      goalsHtml += rowHtml(g.id, g.text, g.window, !!state[g.id], { color: AREA_COLORS[area] });
+    });
+    html += cardHtml(`area-${area}`, ICONS.target, area, `${areaDone}/${goals.length} done`, AREA_COLORS[area], goalsHtml, collapsedCards[`area-${area}`]);
+  });
+
+  html += `<div class="bottom-notes">
+    <p>Chess, Japanese, and boxing are ongoing habits — the win is consistency, not a finish line.</p>
+    <p>Game dev comes after job-readiness goals (web dev, OWASP, resume) — the faster path to being self-dependent.</p>
+  </div>`;
+
+  return html;
+}
+
+function render() {
+  const TABS = [
+    { id: "daily", label: "Daily", icon: "☀️" },
+    { id: "weekly", label: `Week ${activeWeek}`, icon: "🗓️" },
+    { id: "monthly", label: "Month 1", icon: "📅" },
+    { id: "yearly", label: "Yearly", icon: "🎯" },
+  ];
+
+  let tabsHtml = TABS.map(t => `
+    <button class="tab-btn ${tab === t.id ? "active" : ""}" data-tab="${t.id}">${t.icon} ${t.label}</button>
+  `).join("");
+
+  let contentHtml = "";
+  if (tab === "daily") {
+    contentHtml = historyDate ? renderHistoryDay() : renderDaily();
+  }
+  else if (tab === "weekly") contentHtml = renderWeekly();
+  else if (tab === "monthly") contentHtml = renderMonthly();
+  else if (tab === "yearly") contentHtml = renderYearly();
+
+  const app = document.getElementById("app");
+  app.innerHTML = `
+    <div class="header">
+      <div class="eyebrow">Year window: July — July</div>
+      <h1>My Goal System</h1>
+      <p>Yearly → Monthly → Weekly → Daily</p>
+      <div class="sync-status ${syncStatus}" id="sync-status">${syncStatus === "ok" ? "Synced" : syncStatus === "err" ? "Sync error — check connection" : "Syncing…"}</div>
+    </div>
+    <div class="tabs">${tabsHtml}</div>
+    <div class="content">${contentHtml}</div>
+    <div class="footer-note">Changes sync automatically across your devices</div>
+    ${calendarOpen ? renderCalendarOverlay() : ""}
+  `;
+
+  attachListeners();
+}
+
+function attachListeners() {
+  document.querySelectorAll("[data-toggle]").forEach(el => {
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      toggle(el.getAttribute("data-toggle"));
+    });
+  });
+  document.querySelectorAll("[data-cardtoggle]").forEach(el => {
+    el.addEventListener("click", () => {
+      const id = el.getAttribute("data-cardtoggle");
+      collapsedCards[id] = !collapsedCards[id];
+      render();
+    });
+  });
+  document.querySelectorAll("[data-tab]").forEach(el => {
+    el.addEventListener("click", () => {
+      tab = el.getAttribute("data-tab");
+      render();
+    });
+  });
+  document.querySelectorAll("[data-week]").forEach(el => {
+    el.addEventListener("click", () => {
+      activeWeek = parseInt(el.getAttribute("data-week"), 10);
+      render();
+    });
+  });
+  const resetBtn = document.getElementById("reset-day-btn");
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      const week = WEEKS[activeWeek - 1];
+      const ids = [
+        "d_hydrate","d_glance","d_stretch","d_eat1","d_lunch","d_break",
+        `d_wk${week.tasks[0].id}`, `d_wk${week.tasks[1].id}`, `d_wk${week.tasks[2].id}`, "d_custom",
+        "d_h_chess","d_h_jp","d_h_box","d_tomorrow","d_screens","d_lights"
+      ].map(s => `${dKey}_${s}`);
+      ids.forEach(id => delete state[id]);
+      delete state[`${dKey}_d_custom_text`];
+      render();
+      saveState();
+    });
+  }
+  const customInput = document.getElementById("custom-task-input");
+  if (customInput) {
+    customInput.addEventListener("input", (e) => {
+      setCustomText(`${dKey}_d_custom_text`, e.target.value);
+    });
+  }
+
+  // Calendar / History listeners
+  const openCalBtn = document.getElementById("open-calendar-btn");
+  if (openCalBtn) {
+    openCalBtn.addEventListener("click", () => {
+      calendarViewDate = new Date();
+      calendarOpen = true;
+      render();
+    });
+  }
+  const calClose = document.getElementById("cal-close");
+  if (calClose) {
+    calClose.addEventListener("click", () => {
+      calendarOpen = false;
+      render();
+    });
+  }
+  const calOverlay = document.getElementById("calendar-overlay");
+  if (calOverlay) {
+    calOverlay.addEventListener("click", (e) => {
+      if (e.target.id === "calendar-overlay") {
+        calendarOpen = false;
+        render();
+      }
+    });
+  }
+  const calPrev = document.getElementById("cal-prev");
+  if (calPrev) {
+    calPrev.addEventListener("click", () => {
+      calendarViewDate = new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() - 1, 1);
+      render();
+    });
+  }
+  const calNext = document.getElementById("cal-next");
+  if (calNext) {
+    calNext.addEventListener("click", () => {
+      calendarViewDate = new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() + 1, 1);
+      render();
+    });
+  }
+  document.querySelectorAll("[data-history-date]").forEach(el => {
+    el.addEventListener("click", () => {
+      const dk = el.getAttribute("data-history-date");
+      const [y, m, d] = dk.split("-").map(Number);
+      if (dk === dKey) {
+        // today — just go to the normal daily view
+        historyDate = null;
+      } else {
+        historyDate = { year: y, month: m - 1, day: d, key: dk };
+      }
+      calendarOpen = false;
+      render();
+    });
+  });
+  const historyBackBtn = document.getElementById("history-back-btn");
+  if (historyBackBtn) {
+    historyBackBtn.addEventListener("click", () => {
+      historyDate = null;
+      render();
+    });
+  }
+}
+
+// Initial render while waiting for Firebase
+render();
+</script>
+</body>
+</html>

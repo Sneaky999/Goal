@@ -392,7 +392,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
 import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCMTeAom5PZgoblFEdSRqh-aaIQfpCD-pE",
@@ -407,7 +407,10 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
-const stateRef = ref(db, "checklistState");
+// Each person's data lives under their own folder: users/<uid>/checklistState.
+// stateRef is set once we know who signed in (see onAuthStateChanged).
+let stateRef = null;
+const ID_SUFFIX = "@goalsystem.app"; // IDs are typed without this; Firebase just needs an email-shaped name
 
 // ============================================================
 // DATA: Months 1-6, each with theme, ongoing-habit overrides, goals, and weeks
@@ -1197,11 +1200,13 @@ function toggleMilestone(key) {
   saveState();
 }
 
-// ---------------- Auth: sign in anonymously before touching the database ----------------
-// Rules now require `auth != null`, so nothing under stateRef can be read/written
-// until Firebase confirms a signed-in (anonymous) user. This is invisible to you —
-// no login screen, no password — but it stops random visitors without your app's
-// code from ever triggering a valid session against your database.
+// ---------------- Auth: email + password login ----------------
+// The database rules only allow ONE specific account (your UID), so a visitor
+// who is "logged in" with any other account still cannot read or write anything.
+// authState: "loading" (checking saved session) | "out" (show login) | "in"
+let authState = "loading";
+let loginError = "";
+let loginBusy = false;
 let firebaseSyncStarted = false;
 
 function startFirebaseSync() {
@@ -1233,15 +1238,54 @@ function startFirebaseSync() {
 
 onAuthStateChanged(auth, (user) => {
   if (user) {
+    authState = "in";
+    stateRef = ref(db, `users/${user.uid}/checklistState`);
     startFirebaseSync();
+  } else {
+    authState = "out";
   }
-});
-
-signInAnonymously(auth).catch((err) => {
-  console.error("Anonymous sign-in failed:", err);
-  setSyncStatus("err");
   render();
 });
+
+function renderLogin() {
+  const app = document.getElementById("app");
+  if (authState === "loading") {
+    app.innerHTML = `<div class="loading-screen">Loading…</div>`;
+    return;
+  }
+  app.innerHTML = `
+    <div class="header">
+      <div class="eyebrow">Sequential goal system</div>
+      <h1>My Goal System</h1>
+      <p>Sign in to continue</p>
+    </div>
+    <div class="content">
+      <form id="login-form" style="display:flex;flex-direction:column;gap:12px;max-width:360px;margin:24px auto;">
+        <input id="login-email" type="text" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" placeholder="ID" required
+          style="padding:12px;font-size:16px;border:1px solid var(--border);border-radius:8px;">
+        <input id="login-password" type="password" autocomplete="current-password" placeholder="Password" required
+          style="padding:12px;font-size:16px;border:1px solid var(--border);border-radius:8px;">
+        <button type="submit" ${loginBusy ? "disabled" : ""}
+          style="padding:12px;font-size:16px;border:0;border-radius:8px;background:var(--navy);color:#fff;">
+          ${loginBusy ? "Signing in…" : "Sign in"}
+        </button>
+        ${loginError ? `<div style="color:var(--red);font-size:14px;">${loginError}</div>` : ""}
+      </form>
+    </div>`;
+  document.getElementById("login-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const email = document.getElementById("login-email").value.trim().toLowerCase() + ID_SUFFIX;
+    const pw = document.getElementById("login-password").value;
+    loginBusy = true; loginError = "";
+    renderLogin();
+    signInWithEmailAndPassword(auth, email, pw).catch((err) => {
+      console.error("Sign-in failed:", err);
+      loginBusy = false;
+      loginError = "Wrong ID or password.";
+      renderLogin();
+    });
+  });
+}
 
 // ============================================================
 // TRANSITION POPUP (full-screen, shown when a subject completes)
@@ -1861,6 +1905,7 @@ function renderHistoryDay() {
 // MAIN RENDER
 // ============================================================
 function render() {
+  if (authState !== "in") { renderLogin(); return; }
   const TABS = [
     { id: "daily", label: "Daily", icon: "☀️" },
     { id: "subject", label: "Subject", icon: "📘" },
